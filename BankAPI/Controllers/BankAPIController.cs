@@ -19,6 +19,9 @@ namespace BankAPI.Controllers
         {
             account.Id = Guid.NewGuid();
             account.OpenDate = DateTime.Now;
+            if (account.Type == AccountType.Savings) {
+                account.InterestRate = (decimal?)0.03;
+            }
             _accounts.Add(account);
 
             return Ok(new
@@ -70,6 +73,11 @@ namespace BankAPI.Controllers
 
             if (fromAccount.Balance < request.Amount)
                 return BadRequest("Недостаточно средств");
+
+            if (fromAccount.Currency != toAccount.Currency)
+            {
+                return BadRequest("Разные Валюты");
+            }
 
             // Списание
             fromAccount.Balance -= request.Amount;

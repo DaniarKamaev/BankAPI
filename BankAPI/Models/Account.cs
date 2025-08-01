@@ -10,7 +10,7 @@ namespace BankAPI.Models
             public Guid Id { get; set; }
             public Guid OwnerId { get; set; }
             public AccountType Type { get; set; }
-            public string Currency { get; set; } // "USD", "RUB" и т.д.
+            public CurrencyType Currency { get; set; }
             public decimal Balance { get; set; }
             public decimal? InterestRate { get; set; } // только для вкладов/кредитов
             public DateTime OpenDate { get; set; }
@@ -19,10 +19,18 @@ namespace BankAPI.Models
         }
 
         public enum AccountType
-        {
+        { 
             Checking,  // Текущий счёт
             Deposit,   // Вклад
-            Credit     // Кредитный
+            Credit,     // Кредитный
+            Savings
+        }
+
+        public enum CurrencyType
+        {
+            RUB,
+            USD,
+            EUR
         }
     }
 
