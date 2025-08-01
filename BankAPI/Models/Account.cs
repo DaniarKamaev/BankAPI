@@ -3,35 +3,30 @@
 namespace BankAPI.Models
 {
 
-    public class Account
+    namespace BankAPI.Models
     {
-        public Guid Id { get; set; }
-        public Guid ownerId { get; set; } //MARK: - Выпилить set если не понадобится 
-        public Type type { get; set; }
-        public Currency currency { get; set; }
-        public decimal Balance { get; set; }
-        public decimal? interestRate { get; set; } //Процентная ствка(для келитов и дебетов)
-        public DateOnly dataOpen { get; set; }
-        public DateOnly? dataClose { get; set; }
-        public Transaction[]? transactionArray { get; }
+        public class Account
+        {
+            public Guid Id { get; set; }
+            public Guid OwnerId { get; set; }
+            public AccountType Type { get; set; }
+            public string Currency { get; set; } // "USD", "RUB" и т.д.
+            public decimal Balance { get; set; }
+            public decimal? InterestRate { get; set; } // только для вкладов/кредитов
+            public DateTime OpenDate { get; set; }
+            public DateTime? CloseDate { get; set; }
+            public List<Transaction> Transactions { get; set; } = new();
+        }
 
+        public enum AccountType
+        {
+            Checking,  // Текущий счёт
+            Deposit,   // Вклад
+            Credit     // Кредитный
+        }
     }
 
-    public enum Type
-    {
-        Checking,
-         Deposit,
-         Credit
-    }
 
-    public enum Currency
-    {
-        USD, // Доллар США
-        EUR, // Евро
-        RUB, // Российский рубль
-        JPY, // Японская йена
-        GBP  // Фунт стерлингов
-    }
 
-    
+
 }
