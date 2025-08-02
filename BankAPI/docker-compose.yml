@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  bankapi:
+    build:
+      context: .
+      dockerfile: BankAPI/Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=db;Port=5432;Database=bankdb;User Id=postgres;Password=1234;
+    depends_on:
+      - db
+    container_name: bank_web_api
+    restart: unless-stopped
+
+  db:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: bankdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    container_name: db_postgresql_container
+    restart: unless-stopped
+
+volumes:
+  db_data:
+        
+  
+    
