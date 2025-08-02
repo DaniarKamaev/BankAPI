@@ -1,5 +1,6 @@
 ﻿using BankAPI.Models;
 using BankAPI.Models.BankAPI.Models;
+using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Principal;
@@ -9,33 +10,37 @@ namespace BankAPI.Controllers
 {
     [ApiController]
     [Route("api/accounts")]
-    public class AccountController : ControllerBase
+    public class AccountController(IValidator<Account> validator) : ControllerBase
     {
+        
         private static List<Account> _accounts = new();
 
         // Создать счёт
         [HttpPost]
         public IActionResult CreateAccount([FromBody] Account account)
-        {
-            account.Id = Guid.NewGuid();
-            account.OpenDate = DateTime.Now;
-        
-                account.InterestRate = (decimal?)0.03;
-            }
+            {
+            if (account == null)
+                return BadRequest("Аккаунт не найден");
 
-            return Ok(new
+            validator.ValidateAndThrow(account);
+                account.Id = Guid.NewGuid();
+                account.OpenDate = DateTime.Now;
+                _accounts.Add(account);
+            
+                return Ok(new
             {
                 Message = $"Счёт {account.Type} открыт",
                 AccountId = account.Id
             });
         }
 
-        // Получить все счета клиента
-        [HttpGet("owner/{ownerId}")]
+            // Получить все счета клиента
+            [HttpGet("owner/{ownerId}")]
         public IActionResult GetAccounts(Guid ownerId)
         {
             var accounts = _accounts.Where(a => a.OwnerId == ownerId).ToList();
             return Ok(accounts);
+
         }
 
         // Пополнить счёт
@@ -74,9 +79,8 @@ namespace BankAPI.Controllers
                 return BadRequest("Недостаточно средств");
 
             if (fromAccount.Currency != toAccount.Currency)
-            {
                 return BadRequest("Разные Валюты");
-            }
+            
 
             // Списание
             fromAccount.Balance -= request.Amount;

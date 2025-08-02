@@ -23,7 +23,6 @@ namespace BankAPI.Models
             Checking,  // Текущий счёт
             Deposit,   // Вклад
             Credit,     // Кредитный
-            Savings
         }
 
         public enum CurrencyType
