@@ -19,10 +19,9 @@ namespace BankAPI.Controllers
         {
             account.Id = Guid.NewGuid();
             account.OpenDate = DateTime.Now;
-            if (account.Type == AccountType.Savings) {
+        
                 account.InterestRate = (decimal?)0.03;
             }
-            _accounts.Add(account);
 
             return Ok(new
             {
