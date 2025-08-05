@@ -69,8 +69,8 @@ BankAPI - это RESTful API для управления банковскими 
     ```json
     {
       "ownerId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-      "type": "Checking",
-      "currency": "RUB",
+      "type": 0,
+      "currency": 0,
       "balance": 1000,
       "interestRate": null
     }
