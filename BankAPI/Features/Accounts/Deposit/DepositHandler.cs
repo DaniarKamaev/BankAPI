@@ -11,6 +11,10 @@ public class DepositHandler(BankDbContext db) : IRequestHandler<DepositRequest, 
         var account = db.Accounts.FirstOrDefault(a => a.Id == request.AccountId);
         if (account == null) throw new Exception("Account not found");
 
+        if (request.Amount <= 0)
+            throw new Exception("Сумма пополнения должна быть положительной");
+
+
         account.Balance += request.Amount;
         account.Transactions.Add(new Transaction
         {

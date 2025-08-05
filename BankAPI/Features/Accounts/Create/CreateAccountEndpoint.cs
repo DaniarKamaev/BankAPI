@@ -7,13 +7,13 @@ public static class CreateAccountEndpoint
 {
     public static void MapCreateAccountEndpoint(this IEndpointRouteBuilder app)
     {
-        app.MapPost("api/accounts", async (
-            [FromBody] CreateAccount request,
-            IMediator mediator,
-            CancellationToken cancellationToken) =>
+     app.MapPost("api/accounts", async (
+     [FromBody] CreateAccount request,
+     IMediator mediator,
+     CancellationToken cancellationToken) =>
         {
             var response = await mediator.Send(request, cancellationToken);
             return Results.Ok(response);
-        });
+        }).RequireAuthorization();
     }
 }

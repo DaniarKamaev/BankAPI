@@ -2,7 +2,7 @@
 
 public enum AccountType
 {
-    Checking,  // Текущий счёт
-    Deposit,   // Вклад
-    Credit,    // Кредитный
+    Checking,  //текущий счёт
+    Deposit,   //вклад
+    Credit,    //кредитный
 }

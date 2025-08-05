@@ -9,3 +9,4 @@ public record CreateAccount(
     CurrencyType Currency,
     decimal Balance,
     decimal? InterestRate) : IRequest<CreateAccountResponse>;
+

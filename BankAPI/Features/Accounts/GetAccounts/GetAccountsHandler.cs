@@ -1,5 +1,4 @@
 ﻿using BankAPI.Shared;
-using BankAPI.Shared;
 using BankAPI.Shared.Models;
 using MediatR;
 
