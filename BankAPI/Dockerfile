@@ -6,24 +6,36 @@ USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 
-
-# Этот этап используется для сборки проекта службы
+# Стадия сборки
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["BankAPI/BankAPI.csproj", "./"]
-RUN dotnet restore "./BankAPI/BankAPI.csproj"
-COPY . .
-WORKDIR "/src/BankAPI"
-RUN dotnet build "./BankAPI.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# Этот этап используется для публикации проекта службы, который будет скопирован на последний этап
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./BankAPI.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+# Копируем только .csproj из папки BankAPI
+COPY BankAPI/*.csproj ./BankAPI/
+RUN if [ ! -f "BankAPI/BankAPI.csproj" ]; then \
+    echo "Available files:" && ls -la && \
+    echo "Файл проекта должен быть в /src/BankAPI/!" && exit 1; \
+    fi
+RUN dotnet restore "BankAPI/BankAPI.csproj"
 
-# Этот этап используется в рабочей среде или при запуске из VS в обычном режиме (по умолчанию, когда конфигурация отладки не используется)
-FROM base AS final
+# Копируем остальной код из папки BankAPI
+COPY BankAPI/ ./BankAPI/
+RUN dotnet publish "BankAPI/BankAPI.csproj" -c Release -o /app/publish --no-restore
+
+# Финальный образ
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
+
+# Устанавливаем переменные окружения
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:80
+
+# Открываем порт
+EXPOSE 80
+
+# Добавляем проверку работоспособности
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD curl --fail http://localhost/health || exit 1
+
 ENTRYPOINT ["dotnet", "BankAPI.dll"]
