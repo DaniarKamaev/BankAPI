@@ -10,17 +10,17 @@ EXPOSE 80
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Копируем только .csproj из папки BankAPI
-COPY BankAPI/*.csproj ./BankAPI/
-RUN if [ ! -f "BankAPI/BankAPI.csproj" ]; then \
+# Копируем только .csproj из корня (поскольку проект в корне)
+COPY *.csproj ./
+RUN if [ ! -f "BankAPI.csproj" ]; then \
     echo "Available files:" && ls -la && \
-    echo "Файл проекта должен быть в /src/BankAPI/!" && exit 1; \
+    echo "Файл проекта должен быть в /src/!" && exit 1; \
     fi
-RUN dotnet restore "BankAPI/BankAPI.csproj"
+RUN dotnet restore "BankAPI.csproj"
 
-# Копируем остальной код из папки BankAPI
-COPY BankAPI/ ./BankAPI/
-RUN dotnet publish "BankAPI/BankAPI.csproj" -c Release -o /app/publish --no-restore
+# Копируем остальной код из корня
+COPY . ./
+RUN dotnet publish "BankAPI.csproj" -c Release -o /app/publish --no-restore
 
 # Финальный образ
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine
@@ -34,7 +34,8 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 # Открываем порт
 EXPOSE 80
 
-# Добавляем проверку работоспособности
+# Добавляем проверку работоспособности (добавил установку curl, так как alpine не имеет его по умолчанию)
+RUN apk add --no-cache curl
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
     CMD curl --fail http://localhost || exit 1
 
