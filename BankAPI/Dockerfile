@@ -4,7 +4,7 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 USER $APP_UID
 WORKDIR /app
-EXPOSE 8080
+EXPOSE 80
 
 # Стадия сборки
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
@@ -29,13 +29,13 @@ COPY --from=build /app/publish .
 
 # Устанавливаем переменные окружения
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:80
+# ENV ASPNETCORE_URLS=http://+:80
 
 # Открываем порт
 EXPOSE 80
 
 # Добавляем проверку работоспособности
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-    CMD curl --fail http://localhost/health || exit 1
+    CMD curl --fail http://localhost || exit 1
 
 ENTRYPOINT ["dotnet", "BankAPI.dll"]
