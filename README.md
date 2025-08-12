@@ -36,7 +36,7 @@ BankAPI - это RESTful API для управления банковскими 
    docker-compose up --build
    ```
 
-4. API будет доступно по адресу: `http://localhost:8080`
+4. API будет доступно по адресу: `http://localhost:80`
 
 ## Конфигурация
 
