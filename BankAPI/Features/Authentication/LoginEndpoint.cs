@@ -10,16 +10,21 @@ public static class LoginEndpoint
 {
     public static void MapLoginEndpoint(this IEndpointRouteBuilder app)
     {
-        app.MapPost("api/login", async (
-            [FromBody] LoginRequest request,
-            IConfiguration config) =>
+        app.MapPost("api/login", async ([FromBody] LoginRequest request, IConfiguration config) =>
         {
             if (request.Username != "admin" || request.Password != "admin123")
                 return Results.Unauthorized();
 
             var issuer = config["Jwt:Issuer"];
             var audience = config["Jwt:Audience"];
-            var key = Encoding.ASCII.GetBytes(config["Jwt:Key"]);
+            var key = config["Jwt:Key"];
+
+            if (string.IsNullOrEmpty(key))
+                return Results.Problem("JWT Key is not configured.");
+
+            var keyBytes = Encoding.ASCII.GetBytes(key);
+            if (keyBytes.Length < 16)
+                return Results.Problem("JWT Key must be at least 16 bytes long for HMAC-SHA512.");
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -34,7 +39,7 @@ public static class LoginEndpoint
                 Issuer = issuer,
                 Audience = audience,
                 SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(key),
+                    new SymmetricSecurityKey(keyBytes),
                     SecurityAlgorithms.HmacSha512Signature)
             };
 

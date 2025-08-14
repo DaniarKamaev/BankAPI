@@ -1,12 +1,42 @@
-﻿using BankAPI.Shared.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using BankAPI.Shared.Models;
 
 namespace BankAPI.Shared;
 
-public class BankDbContext
+public class BankDbContext : DbContext
 {
-    public List<Account> Accounts { get; } = new();
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<Transaction> Transactions { get; set; }
+
+    public BankDbContext(DbContextOptions<BankDbContext> options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        return Task.CompletedTask;
+        modelBuilder.Entity<Account>()
+            .HasMany(a => a.Transactions)
+            .WithOne()
+            .HasForeignKey(t => t.AccountId);
+
+        modelBuilder.Entity<Transaction>()
+            .Property(t => t.Amount)
+            .HasColumnType("numeric(18,2)");
+
+        modelBuilder.Entity<Transaction>()
+            .Property(t => t.Currency)
+            .HasConversion<int>();
+
+        modelBuilder.Entity<Transaction>()
+            .Property(t => t.Type)
+            .HasConversion<int>();
+
+        modelBuilder.Entity<Transaction>()
+            .Property(t => t.Description)
+            .IsRequired();
+
+        modelBuilder.Entity<Transaction>()
+            .HasOne<Account>()
+            .WithMany()
+            .HasForeignKey(t => t.CounterpartyAccountId)
+            .IsRequired(false);
     }
 }

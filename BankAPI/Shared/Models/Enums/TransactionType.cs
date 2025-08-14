@@ -2,6 +2,6 @@
 
 public enum TransactionType
 {
-    Credit, // Зачисление
-    Debit   // Списание
+    Debit,   // Списание
+    Credit // Зачисление
 }

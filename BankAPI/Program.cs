@@ -8,11 +8,31 @@ using BankAPI.Shared.Behaviors;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using SharpGrip.FluentValidation.AutoValidation.Shared.Extensions;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+Console.WriteLine($"Connection String: {connectionString ?? "ConnectionString is null"}");
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new InvalidOperationException("ConnectionString 'DefaultConnection' is not configured.");
+}
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+Console.WriteLine($"JWT Key: {jwtKey ?? "JWT Key is null"}");
+if (string.IsNullOrEmpty(jwtKey))
+{
+    throw new InvalidOperationException("JWT Key is not configured.");
+}
+var jwtKeyBytes = Encoding.UTF8.GetBytes(jwtKey);
+Console.WriteLine($"JWT Key length: {jwtKeyBytes.Length} bytes");
+if (jwtKeyBytes.Length < 64)
+{
+    throw new InvalidOperationException("JWT Key must be at least 64 bytes long for HMAC-SHA512.");
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -25,29 +45,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-            ),
+            IssuerSigningKey = new SymmetricSecurityKey(jwtKeyBytes)
         };
     });
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddValidatorsFromAssemblyContaining<CreateAccountValidator>();
-builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 ValidatorOptions.Global.DefaultClassLevelCascadeMode = CascadeMode.Continue;
 ValidatorOptions.Global.DefaultRuleLevelCascadeMode = CascadeMode.Stop;
 
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+builder.Services.AddDbContext<BankDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
-builder.Services.AddMediatR(cfg =>
-    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
-builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
-
-builder.Services.AddSingleton<BankDbContext>();
+builder.Services.AddLogging(logging => logging.AddConsole());
 
 var app = builder.Build();
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        if (exception != null)
+        {
+            await context.Response.WriteAsJsonAsync(new { Error = exception.Error.Message });
+        }
+    });
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

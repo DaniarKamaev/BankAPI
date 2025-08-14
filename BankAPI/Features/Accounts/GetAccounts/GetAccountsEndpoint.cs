@@ -7,13 +7,9 @@ public static class GetAccountsEndpoint
 {
     public static void MapGetAccountsEndpoint(this IEndpointRouteBuilder app)
     {
-        app.MapGet("api/accounts/owner/{ownerId}", async (
-    [FromRoute] Guid ownerId,
-    IMediator mediator,
-    CancellationToken cancellationToken) =>
+        app.MapGet("/api/accounts/owner/{ownerId}", async (Guid ownerId, IMediator mediator) =>
         {
-            var query = new GetAccountsQuery(ownerId);
-            var accounts = await mediator.Send(query, cancellationToken);
+            var accounts = await mediator.Send(new GetAccountsQuery(ownerId));
             return Results.Ok(accounts);
         }).RequireAuthorization();
     }

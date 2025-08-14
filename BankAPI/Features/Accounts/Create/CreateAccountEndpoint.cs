@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BankAPI.Features.Accounts.Create;
@@ -12,8 +13,19 @@ public static class CreateAccountEndpoint
      IMediator mediator,
      CancellationToken cancellationToken) =>
         {
-            var response = await mediator.Send(request, cancellationToken);
-            return Results.Ok(response);
+            try
+            {
+                var response = await mediator.Send(request, cancellationToken);
+                return Results.Ok(response);
+            }
+            catch (ValidationException ex)
+            {
+                return Results.BadRequest(ex.Errors);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(ex.Message);
+            }
         }).RequireAuthorization();
     }
 }

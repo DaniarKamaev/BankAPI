@@ -7,13 +7,10 @@ public static class TransferEndpoint
 {
     public static void MapTransferEndpoint(this IEndpointRouteBuilder app)
     {
-    app.MapPost("api/accounts/transfer", async (
-    [FromBody] TransferRequest request,
-    IMediator mediator,
-    CancellationToken cancellationToken) =>
+        app.MapPost("/api/transfer", async ([FromBody] TransferRequest request, IMediator mediator) =>
         {
-            var result = await mediator.Send(request, cancellationToken);
-            return Results.Ok(result);
+            var response = await mediator.Send(request);
+            return Results.Ok(response);
         }).RequireAuthorization();
     }
 }

@@ -1,33 +1,55 @@
 ﻿using BankAPI.Shared;
 using BankAPI.Shared.Models;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace BankAPI.Features.Accounts.Deposit;
 
-public class DepositHandler(BankDbContext db) : IRequestHandler<DepositRequest, string>
+
+public class DepositHandler(BankDbContext db) : IRequestHandler<DepositRequest, DepositResponse>
 {
-    public async Task<string> Handle(DepositRequest request, CancellationToken cancellationToken)
+    public async Task<DepositResponse> Handle(DepositRequest request, CancellationToken cancellationToken)
     {
-        var account = db.Accounts.FirstOrDefault(a => a.Id == request.AccountId);
-        if (account == null) throw new Exception("Account not found");
-
-        if (request.Amount <= 0)
-            throw new Exception("Сумма пополнения должна быть положительной");
-
-
-        account.Balance += request.Amount;
-        account.Transactions.Add(new Transaction
+        try
         {
-            Id = Guid.NewGuid(),
-            AccountId = request.AccountId,
-            Amount = request.Amount,
-            Currency = account.Currency,
-            Type = TransactionType.Credit,
-            Description = "Пополнение наличными",
-            DateTime = DateTime.Now
-        });
+            var account = await db.Accounts
+                .FirstOrDefaultAsync(a => a.Id == request.AccountId, cancellationToken)
+                ?? throw new InvalidOperationException($"Учетная запись с идентификатором {request.AccountId} не найдена.");
 
-        await db.SaveChangesAsync(cancellationToken);
-        return $"Счёт пополнен на {request.Amount} {account.Currency}";
+            if (request.Amount <= 0)
+                throw new InvalidOperationException("Сумма депозита должна быть положительной.");
+
+            account.Balance += request.Amount;
+
+            var deposit = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = request.AccountId,
+                CounterpartyAccountId = null, // Для депозита контрагент не требуется
+                Amount = request.Amount,
+                Currency = (CurrencyType)account.Currency, // Используем валюту счёта
+                Type = TransactionType.Debit,
+                Description = $"Deposit of {request.Amount} to Account {request.AccountId}",
+                DateTime = DateTime.UtcNow
+            };
+
+            await db.Transactions.AddAsync(deposit, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+
+            Console.WriteLine($"Deposited {request.Amount} to AccountId: {request.AccountId}");
+            return new DepositResponse(
+                "Депозит выполнен",
+                account.Balance);
+        }
+        catch (DbUpdateException ex)
+        {
+            Console.WriteLine($"DbUpdateException: {ex.InnerException?.Message ?? ex.Message}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in DepositHandler: {ex.Message}");
+            throw;
+        }
     }
 }
