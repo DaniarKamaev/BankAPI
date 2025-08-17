@@ -1,11 +1,14 @@
 using BankAPI.Features.Accounts.Create;
 using BankAPI.Features.Accounts.Deposit;
 using BankAPI.Features.Accounts.GetAccounts;
+using BankAPI.Features.Accounts.Interest;
 using BankAPI.Features.Accounts.Transfer;
 using BankAPI.Features.Authentication;
 using BankAPI.Shared;
 using BankAPI.Shared.Behaviors;
 using FluentValidation;
+using Hangfire;
+using Hangfire.PostgreSql;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +64,11 @@ ValidatorOptions.Global.DefaultRuleLevelCascadeMode = CascadeMode.Stop;
 builder.Services.AddDbContext<BankDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+builder.Services.AddHangfire(config =>
+    config.UsePostgreSqlStorage(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHangfireServer();
+builder.Services.AddScoped<IInterestAccrualService, InterestAccrualService>();
+
 builder.Services.AddLogging(logging => logging.AddConsole());
 
 var app = builder.Build();
@@ -77,6 +85,12 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
+using (var scope = app.Services.CreateScope())
+{
+    var interestService = scope.ServiceProvider.GetRequiredService<IInterestAccrualService>();
+    interestService.Initialize();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -85,5 +99,6 @@ app.MapGetAccountsEndpoint();
 app.MapDepositEndpoint();
 app.MapTransferEndpoint();
 app.MapLoginEndpoint();
+
 
 app.Run();
