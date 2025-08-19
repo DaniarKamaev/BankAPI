@@ -2,40 +2,45 @@
 using BankAPI.Shared.Models;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using System.Transactions;
 
 namespace BankAPI.Features.Accounts.Transfer;
 
-public class TransferHandler(BankDbContext db) : IRequestHandler<TransferRequest, TransferResponse>
+public class TransferHandler : IRequestHandler<TransferRequest, TransferResponse>
 {
+    private readonly BankDbContext _db;
+    private readonly RabbitMqService _rabbitMq;
+    private readonly ILogger<TransferHandler> _logger;
+
+    public TransferHandler(
+        BankDbContext db,
+        RabbitMqService rabbitMq,
+        ILogger<TransferHandler> logger)
+    {
+        _db = db;
+        _rabbitMq = rabbitMq;
+        _logger = logger;
+    }
+
     public async Task<TransferResponse> Handle(TransferRequest request, CancellationToken cancellationToken)
     {
-        var transactionOptions = new TransactionOptions
-        {
-            IsolationLevel = IsolationLevel.Serializable,
-            Timeout = TransactionManager.DefaultTimeout
-        };
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
-        using var scope = new TransactionScope(TransactionScopeOption.Required,
-                                            transactionOptions,
-                                            TransactionScopeAsyncFlowOption.Enabled);
         try
         {
-            var fromAccount = await db.Accounts
+            var fromAccount = await _db.Accounts
                 .FirstOrDefaultAsync(a => a.Id == request.FromAccountId, cancellationToken)
-                ?? throw new InvalidOperationException($"Account with Id {request.FromAccountId} not found.");
+                ?? throw new InvalidOperationException($"Account {request.FromAccountId} not found");
 
-            var toAccount = await db.Accounts
+            var toAccount = await _db.Accounts
                 .FirstOrDefaultAsync(a => a.Id == request.ToAccountId, cancellationToken)
-                ?? throw new InvalidOperationException($"Account with Id {request.ToAccountId} not found.");
+                ?? throw new InvalidOperationException($"Account {request.ToAccountId} not found");
 
             if (fromAccount.Balance < request.Amount)
-                throw new InvalidOperationException("Insufficient balance for transfer.");
+                throw new InvalidOperationException("Insufficient funds");
 
             if (fromAccount.Currency != toAccount.Currency)
-                throw new InvalidOperationException("Accounts must have the same currency for transfer.");
+                throw new InvalidOperationException("Currency mismatch");
 
-            // Выполняем перевод
             fromAccount.Balance -= request.Amount;
             toAccount.Balance += request.Amount;
 
@@ -47,7 +52,7 @@ public class TransferHandler(BankDbContext db) : IRequestHandler<TransferRequest
                 Amount = -request.Amount,
                 Currency = (CurrencyType)fromAccount.Currency,
                 Type = TransactionType.Credit,
-                Description = $"Transfer to Account {request.ToAccountId}",
+                Description = $"Transfer to {request.ToAccountId}",
                 DateTime = DateTime.UtcNow
             };
 
@@ -59,38 +64,45 @@ public class TransferHandler(BankDbContext db) : IRequestHandler<TransferRequest
                 Amount = request.Amount,
                 Currency = (CurrencyType)toAccount.Currency,
                 Type = TransactionType.Debit,
-                Description = $"Transfer from Account {request.FromAccountId}",
+                Description = $"Transfer from {request.FromAccountId}",
                 DateTime = DateTime.UtcNow
             };
 
-            await db.Transactions.AddRangeAsync([withdrawal, deposit], cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
+            await _db.Transactions.AddAsync(withdrawal, cancellationToken);
+            await _db.Transactions.AddAsync(deposit, cancellationToken);
 
-            // Проверка балансов (дополнительная защита)
-            var totalBefore = fromAccount.Balance + request.Amount + toAccount.Balance - request.Amount;
-            var totalAfter = fromAccount.Balance + toAccount.Balance;
+            await _db.SaveChangesAsync(cancellationToken);
 
-            if (Math.Abs(totalBefore - totalAfter) > 0.01m)
+            var transferEvent = new
             {
-                throw new InvalidOperationException("Balance consistency check failed. Transaction rolled back.");
-            }
+                TransactionId = withdrawal.Id,
+                FromAccountId = request.FromAccountId,
+                ToAccountId = request.ToAccountId,
+                Amount = request.Amount,
+                Currency = withdrawal.Currency.ToString(),
+                Timestamp = DateTime.UtcNow
+            };
 
-            scope.Complete();
+            _rabbitMq.Publish(
+                message: transferEvent,
+                routingKey: "Перевод успешно выполнен",
+                correlationId: Guid.NewGuid());
 
-            Console.WriteLine($"Transferred {request.Amount} from AccountId: {request.FromAccountId} to AccountId: {request.ToAccountId}");
+            await transaction.CommitAsync(cancellationToken);
+
+            _logger.LogInformation("Transfer completed: {Amount} from {From} to {To}",
+                request.Amount, request.FromAccountId, request.ToAccountId);
+
             return new TransferResponse(
                 "Transfer completed successfully",
                 fromAccount.Balance,
                 toAccount.Balance);
         }
-        catch (DbUpdateException ex)
-        {
-            Console.WriteLine($"DbUpdateException: {ex.InnerException?.Message ?? ex.Message}");
-            throw;
-        }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in TransferHandler: {ex.Message}");
+            await transaction.RollbackAsync(cancellationToken);
+            _logger.LogError(ex, "Transfer failed from {From} to {To}",
+                request.FromAccountId, request.ToAccountId);
             throw;
         }
     }

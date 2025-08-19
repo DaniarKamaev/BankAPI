@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   bankapi:
     build:
@@ -14,23 +12,50 @@ services:
       - Jwt__Key=ThisIsASuperSecureKeyForHMACSHA512ThatIsAtLeast64CharactersLong1234567890
       - Jwt__Issuer=your_issuer
       - Jwt__Audience=your_audience
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
     depends_on:
       - db
+      - rabbitmq
     container_name: bank_web_api
     restart: unless-stopped
 
   db:
     image: postgres:latest
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=YourStrongPassword123
-      - POSTGRES_DB=bankdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: bankdb
     volumes:
       - db_data:/var/lib/postgresql/data
     container_name: db_postgresql_container
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 volumes:
   db_data:
+  rabbitmq_data:
+
+networks:
+  default:
+    name: bank-network
+    driver: bridge

@@ -69,9 +69,15 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IInterestAccrualService, InterestAccrualService>();
 
+builder.Services.AddTransient<IRequestHandler<TransferRequest, TransferResponse>, TransferHandler>();
+builder.Services.AddSingleton<RabbitMqService>();
+
 builder.Services.AddLogging(logging => logging.AddConsole());
 
+
 var app = builder.Build();
+
+var rabbitService = app.Services.GetRequiredService<RabbitMqService>();
 
 app.UseExceptionHandler(errorApp =>
 {
@@ -87,8 +93,15 @@ app.UseExceptionHandler(errorApp =>
 
 using (var scope = app.Services.CreateScope())
 {
-    var interestService = scope.ServiceProvider.GetRequiredService<IInterestAccrualService>();
-    interestService.Initialize();
+    try
+    {
+        var RabbitService = scope.ServiceProvider.GetRequiredService<RabbitMqService>();
+        Console.WriteLine("RabbitMQ подключен и очереди созданы");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Ошибка подключения к RabbitMQ: {ex.Message}");
+    }
 }
 
 app.UseAuthentication();

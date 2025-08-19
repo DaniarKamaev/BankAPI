@@ -1,12 +1,13 @@
 ﻿using BankAPI.Shared;
 using BankAPI.Shared.Models;
+using BankAPI.Shared.Models.RabbitModel;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace BankAPI.Features.Accounts.Deposit;
 
 
-public class DepositHandler(BankDbContext db) : IRequestHandler<DepositRequest, DepositResponse>
+public class DepositHandler(BankDbContext db, RabbitMqService rabbitMq) : IRequestHandler<DepositRequest, DepositResponse>
 {
     public async Task<DepositResponse> Handle(DepositRequest request, CancellationToken cancellationToken)
     {
@@ -35,6 +36,14 @@ public class DepositHandler(BankDbContext db) : IRequestHandler<DepositRequest, 
 
             await db.Transactions.AddAsync(deposit, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+
+            var @event = new AccountOpenedEvent(
+             account.Id,
+             account.OwnerId,
+             account.Currency.ToString(),
+             account.Type.ToString());
+
+            rabbitMq.Publish(@event, "Депозит упешно внесен", Guid.NewGuid());
 
             Console.WriteLine($"Deposited {request.Amount} to AccountId: {request.AccountId}");
             return new DepositResponse(
