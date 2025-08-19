@@ -7,6 +7,7 @@ public class BankDbContext : DbContext
 {
     public DbSet<Account> Accounts { get; set; }
     public DbSet<Transaction> Transactions { get; set; }
+    public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     public BankDbContext(DbContextOptions<BankDbContext> options) : base(options) { }
 
@@ -38,5 +39,15 @@ public class BankDbContext : DbContext
             .WithMany()
             .HasForeignKey(t => t.CounterpartyAccountId)
             .IsRequired(false);
+
+        modelBuilder.Entity<OutboxMessage>(entity =>
+        {
+            entity.Property(m => m.Id).ValueGeneratedNever();
+            entity.Property(m => m.EventType).IsRequired().HasMaxLength(100);
+            entity.Property(m => m.EventData).IsRequired().HasColumnType("jsonb");
+            entity.Property(m => m.CreatedAt).IsRequired();
+            entity.Property(m => m.Status).IsRequired();
+        });
+
     }
 }

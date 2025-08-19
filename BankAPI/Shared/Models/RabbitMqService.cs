@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace BankAPI.Shared;
+namespace BankAPI.Shared.Models;
 
 public class RabbitMqService : IDisposable
 {

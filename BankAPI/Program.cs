@@ -6,6 +6,7 @@ using BankAPI.Features.Accounts.Transfer;
 using BankAPI.Features.Authentication;
 using BankAPI.Shared;
 using BankAPI.Shared.Behaviors;
+using BankAPI.Shared.Models;
 using FluentValidation;
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -74,6 +75,7 @@ builder.Services.AddSingleton<RabbitMqService>();
 
 builder.Services.AddLogging(logging => logging.AddConsole());
 
+//builder.Services.AddHostedService<OutboxDispatcherService>();
 
 var app = builder.Build();
 

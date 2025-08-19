@@ -1,7 +1,9 @@
 ﻿using BankAPI.Shared;
 using BankAPI.Shared.Models;
+using BankAPI.Shared.Models.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace BankAPI.Features.Accounts.Transfer;
 
@@ -35,34 +37,41 @@ public class TransferHandler : IRequestHandler<TransferRequest, TransferResponse
                 .FirstOrDefaultAsync(a => a.Id == request.ToAccountId, cancellationToken)
                 ?? throw new InvalidOperationException($"Account {request.ToAccountId} not found");
 
+            // Проверки
             if (fromAccount.Balance < request.Amount)
                 throw new InvalidOperationException("Insufficient funds");
 
             if (fromAccount.Currency != toAccount.Currency)
                 throw new InvalidOperationException("Currency mismatch");
 
+            // Выполняем перевод
             fromAccount.Balance -= request.Amount;
             toAccount.Balance += request.Amount;
 
-            var withdrawal = new Shared.Models.Transaction
+            // Явно отмечаем изменения
+            _db.Entry(fromAccount).State = EntityState.Modified;
+            _db.Entry(toAccount).State = EntityState.Modified;
+
+            // Создаем транзакции
+            var withdrawal = new BankAPI.Shared.Models.Transaction
             {
                 Id = Guid.NewGuid(),
                 AccountId = request.FromAccountId,
                 CounterpartyAccountId = request.ToAccountId,
                 Amount = -request.Amount,
-                Currency = (CurrencyType)fromAccount.Currency,
+                Currency = fromAccount.Currency,
                 Type = TransactionType.Credit,
                 Description = $"Transfer to {request.ToAccountId}",
                 DateTime = DateTime.UtcNow
             };
 
-            var deposit = new Shared.Models.Transaction
+            var deposit = new BankAPI.Shared.Models.Transaction
             {
                 Id = Guid.NewGuid(),
                 AccountId = request.ToAccountId,
                 CounterpartyAccountId = request.FromAccountId,
                 Amount = request.Amount,
-                Currency = (CurrencyType)toAccount.Currency,
+                Currency = toAccount.Currency,
                 Type = TransactionType.Debit,
                 Description = $"Transfer from {request.FromAccountId}",
                 DateTime = DateTime.UtcNow
@@ -71,27 +80,44 @@ public class TransferHandler : IRequestHandler<TransferRequest, TransferResponse
             await _db.Transactions.AddAsync(withdrawal, cancellationToken);
             await _db.Transactions.AddAsync(deposit, cancellationToken);
 
-            await _db.SaveChangesAsync(cancellationToken);
-
-            var transferEvent = new
+            // Сохраняем Outbox сообщение
+            var outboxMessage = new OutboxMessage
             {
-                TransactionId = withdrawal.Id,
-                FromAccountId = request.FromAccountId,
-                ToAccountId = request.ToAccountId,
-                Amount = request.Amount,
-                Currency = withdrawal.Currency.ToString(),
-                Timestamp = DateTime.UtcNow
+                Id = Guid.NewGuid(),
+                EventType = "TransferCompleted",
+                EventData = JsonSerializer.Serialize(new
+                {
+                    TransactionId = withdrawal.Id,
+                    FromAccountId = request.FromAccountId,
+                    ToAccountId = request.ToAccountId,
+                    Amount = request.Amount,
+                    Currency = fromAccount.Currency.ToString(),
+                    Timestamp = DateTime.UtcNow
+                }),
+                CreatedAt = DateTime.UtcNow
             };
 
-            _rabbitMq.Publish(
-                message: transferEvent,
-                routingKey: "Перевод успешно выполнен",
-                correlationId: Guid.NewGuid());
+            await _db.OutboxMessages.AddAsync(outboxMessage, cancellationToken);
 
+
+            // Перед SaveChanges
+            _logger.LogInformation("Saving {TransactionsCount} transactions and {OutboxCount} outbox messages",
+                2, 1);
+
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("SaveChanges successful");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SaveChanges failed");
+                throw;
+            }
+
+            // Сохраняем все изменения
+            await _db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-
-            _logger.LogInformation("Transfer completed: {Amount} from {From} to {To}",
-                request.Amount, request.FromAccountId, request.ToAccountId);
 
             return new TransferResponse(
                 "Transfer completed successfully",
@@ -101,9 +127,9 @@ public class TransferHandler : IRequestHandler<TransferRequest, TransferResponse
         catch (Exception ex)
         {
             await transaction.RollbackAsync(cancellationToken);
-            _logger.LogError(ex, "Transfer failed from {From} to {To}",
-                request.FromAccountId, request.ToAccountId);
+            _logger.LogError(ex, "Transfer failed");
             throw;
         }
     }
+
 }
