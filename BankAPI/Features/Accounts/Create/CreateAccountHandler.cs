@@ -19,6 +19,7 @@ public class CreateAccountHandler(BankDbContext db, RabbitMqService rabbitMq) : 
             Balance = request.Balance,
             InterestRate = request.InterestRate,
             OpenDate = DateTime.UtcNow,
+            IsLocked = false,
             Transactions = new List<Transaction>()
         };
 

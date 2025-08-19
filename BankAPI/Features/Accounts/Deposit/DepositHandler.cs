@@ -17,6 +17,9 @@ public class DepositHandler(BankDbContext db, RabbitMqService rabbitMq) : IReque
                 .FirstOrDefaultAsync(a => a.Id == request.AccountId, cancellationToken)
                 ?? throw new InvalidOperationException($"Учетная запись с идентификатором {request.AccountId} не найдена.");
 
+            if (account.IsLocked)
+                throw new InvalidOperationException("Account is loked");
+
             if (request.Amount <= 0)
                 throw new InvalidOperationException("Сумма депозита должна быть положительной.");
 

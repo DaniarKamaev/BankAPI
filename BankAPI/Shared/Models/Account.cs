@@ -10,5 +10,6 @@ public class Account
     public decimal? InterestRate { get; set; } //только для вкладов/кредитов
     public DateTime OpenDate { get; set; } = DateTime.UtcNow;
     public DateTime? CloseDate { get; set; }
+    public bool IsLocked { get; set; } = false;
     public List<Transaction> Transactions { get; set; } = new();
 }

@@ -1,3 +1,4 @@
+using BankAPI.Features.Accounts.Close;
 using BankAPI.Features.Accounts.Create;
 using BankAPI.Features.Accounts.Deposit;
 using BankAPI.Features.Accounts.GetAccounts;
@@ -113,6 +114,7 @@ app.MapCreateAccountEndpoint();
 app.MapGetAccountsEndpoint();
 app.MapDepositEndpoint();
 app.MapTransferEndpoint();
+app.MapCloseAccountEndpoint();
 app.MapLoginEndpoint();
 
 

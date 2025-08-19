@@ -44,6 +44,9 @@ public class TransferHandler : IRequestHandler<TransferRequest, TransferResponse
             if (fromAccount.Currency != toAccount.Currency)
                 throw new InvalidOperationException("Currency mismatch");
 
+            if (fromAccount.IsLocked)
+                throw new InvalidOperationException("Account is loked");
+
             // Выполняем перевод
             fromAccount.Balance -= request.Amount;
             toAccount.Balance += request.Amount;

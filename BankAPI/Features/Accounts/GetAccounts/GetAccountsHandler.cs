@@ -15,7 +15,7 @@ public class GetAccountsHandler(BankDbContext db) : IRequestHandler<GetAccountsQ
             Console.WriteLine($"Запрос учетных записей на идентификатор владельца: {request.OwnerId}");
             var accounts = await db.Accounts
                 .Where(a => a.OwnerId == request.OwnerId)
-                .Include(a => a.Transactions) // Жадно загружаем транзакции
+                .Include(a => a.Transactions)
                 .ToListAsync(cancellationToken);
             Console.WriteLine($"Найдены {accounts.Count} аккаунтов");
             return accounts;

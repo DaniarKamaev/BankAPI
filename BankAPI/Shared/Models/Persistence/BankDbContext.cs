@@ -18,6 +18,10 @@ public class BankDbContext : DbContext
             .WithOne()
             .HasForeignKey(t => t.AccountId);
 
+        modelBuilder.Entity<Account>()
+        .Property(a => a.IsLocked)
+        .HasDefaultValue(false); // Добавляем конфигурацию для IsLocked
+
         modelBuilder.Entity<Transaction>()
             .Property(t => t.Amount)
             .HasColumnType("numeric(18,2)");
